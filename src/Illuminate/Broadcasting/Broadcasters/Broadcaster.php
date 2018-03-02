@@ -20,6 +20,13 @@ abstract class Broadcaster implements BroadcasterContract
     protected $channels = [];
 
     /**
+     * The registered channel options.
+     *
+     * @var array
+     */
+    protected $channelsOptions = [];
+
+    /**
      * The binding registrar instance.
      *
      * @var BindingRegistrar
@@ -33,9 +40,10 @@ abstract class Broadcaster implements BroadcasterContract
      * @param  callable  $callback
      * @return $this
      */
-    public function channel($channel, callable $callback)
+    public function channel($channel, callable $callback, array $options = [])
     {
         $this->channels[$channel] = $callback;
+        $this->channelsOptions[$channel] = $options;
 
         return $this;
     }
@@ -50,6 +58,16 @@ abstract class Broadcaster implements BroadcasterContract
      */
     protected function verifyUserCanAccessChannel($request, $channel)
     {
+        $options = [];
+
+        foreach ($this->channelsOptions as $pattern => $opts) {
+            if (! Str::is(preg_replace('/\{(.*?)\}/', '*', $pattern), $channel)) {
+                continue;
+            }
+
+            $options = $opts;
+        }
+
         foreach ($this->channels as $pattern => $callback) {
             if (! Str::is(preg_replace('/\{(.*?)\}/', '*', $pattern), $channel)) {
                 continue;
@@ -57,7 +75,7 @@ abstract class Broadcaster implements BroadcasterContract
 
             $parameters = $this->extractAuthParameters($pattern, $channel, $callback);
 
-            if ($result = $callback($request->user(), ...$parameters)) {
+            if ($result = $callback($request->user($options['guard'] ?? null), ...$parameters)) {
                 return $this->validAuthenticationResponse($request, $result);
             }
         }
