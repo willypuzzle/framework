@@ -47,6 +47,16 @@ class DatabaseEloquentPivotTest extends TestCase
         $this->assertEquals(['name' => 'Taylor'], $pivot->foo);
     }
 
+    public function testFromRawAttributesDoesNotMutate()
+    {
+        $parent = m::mock('Illuminate\Database\Eloquent\Model[getConnectionName]');
+        $parent->shouldReceive('getConnectionName')->once()->andReturn('connection');
+
+        $pivot = DatabaseEloquentPivotTestMutatorStub::fromRawAttributes($parent, ['foo' => 'bar'], 'table', true);
+
+        $this->assertFalse($pivot->getMutatorCalled());
+    }
+
     public function testPropertiesUnchangedAreNotDirty()
     {
         $parent = m::mock('Illuminate\Database\Eloquent\Model[getConnectionName]');
@@ -76,6 +86,14 @@ class DatabaseEloquentPivotTest extends TestCase
 
         $pivot = DatabaseEloquentPivotTestDateStub::fromAttributes($parent, ['foo' => 'bar'], 'table');
         $this->assertFalse($pivot->timestamps);
+    }
+
+    public function testTimestampPropertyIsTrueWhenCreatingFromRawAttributes()
+    {
+        $parent = m::mock('Illuminate\Database\Eloquent\Model[getConnectionName,getDates]');
+        $parent->shouldReceive('getConnectionName')->andReturn('connection');
+        $pivot = Pivot::fromRawAttributes($parent, ['foo' => 'bar', 'created_at' => 'foo'], 'table');
+        $this->assertTrue($pivot->timestamps);
     }
 
     public function testKeysCanBeSetProperly()
