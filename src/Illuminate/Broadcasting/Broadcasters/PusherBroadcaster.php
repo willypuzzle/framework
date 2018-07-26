@@ -10,6 +10,8 @@ use Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException;
 
 class PusherBroadcaster extends Broadcaster
 {
+    use UsePusherChannelsNames;
+
     /**
      * The Pusher SDK instance.
      *
@@ -39,15 +41,13 @@ class PusherBroadcaster extends Broadcaster
     {
         $channelName = $this->normalizeChannelName($request->channel_name);
 
-        $options = $this->retrieveChannelOptions($channelName);
-
         if ($this->isGuardedChannel($request->channel_name) &&
-            ! $this->retrieveUser($request, $options['guards'] ?? null)) {
+            ! $this->retrieveUser($request, $channelName)) {
             throw new AccessDeniedHttpException;
         }
 
         return parent::verifyUserCanAccessChannel(
-            $request, $channelName, $options
+            $request, $channelName
         );
     }
 
@@ -66,15 +66,13 @@ class PusherBroadcaster extends Broadcaster
             );
         }
 
-        $options = $this->retrieveChannelOptions(
-            $this->normalizeChannelName($request->channel_name)
-        );
+        $channelName = $this->normalizeChannelName($request->channel_name);
 
         return $this->decodePusherResponse(
             $request,
             $this->pusher->presence_auth(
                 $request->channel_name, $request->socket_id,
-                $this->retrieveUser($request, $options['guards'] ?? null)->getAuthIdentifier(), $result
+                $this->retrieveUser($request, $channelName)->getAuthIdentifier(), $result
             )
         );
     }
@@ -130,32 +128,5 @@ class PusherBroadcaster extends Broadcaster
     public function getPusher()
     {
         return $this->pusher;
-    }
-
-    /**
-     * Return true if channel is protected by authentication
-     *
-     * @param  string  $channel
-     * @return bool
-     */
-    public function isGuardedChannel($channel)
-    {
-        return Str::startsWith($channel, ['private-', 'presence-']);
-    }
-
-    /**
-     * Remove prefix from channel name
-     *
-     * @param  string  $channel
-     * @return string
-     */
-    public function normalizeChannelName($channel)
-    {
-        if ($this->isGuardedChannel($channel)) {
-            return Str::startsWith($channel, 'private-')
-                ? Str::replaceFirst('private-', '', $channel)
-                : Str::replaceFirst('presence-', '', $channel);
-        }
-        return $channel;
     }
 }

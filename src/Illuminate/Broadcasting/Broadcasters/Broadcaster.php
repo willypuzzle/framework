@@ -41,7 +41,7 @@ abstract class Broadcaster implements BroadcasterContract
      *
      * @param  string  $channel
      * @param  callable|string  $callback
-     * @param  array   $options
+     * @param  array  $options
      * @return $this
      */
     public function channel($channel, $callback, $options = [])
@@ -58,14 +58,13 @@ abstract class Broadcaster implements BroadcasterContract
      *
      * @param  \Illuminate\Http\Request  $request
      * @param  string  $channel
-     * @param  array   $options
      * @return mixed
      * @throws \Symfony\Component\HttpKernel\Exception\AccessDeniedHttpException
      */
-    protected function verifyUserCanAccessChannel($request, $channel, $options = [])
+    protected function verifyUserCanAccessChannel($request, $channel)
     {
         foreach ($this->channels as $pattern => $callback) {
-            if (! Str::is(preg_replace('/\{(.*?)\}/', '*', $pattern), $channel)) {
+            if (! $this->channelNameMatchPattern($channel, $pattern)) {
                 continue;
             }
 
@@ -73,7 +72,7 @@ abstract class Broadcaster implements BroadcasterContract
 
             $handler = $this->normalizeChannelHandlerToCallable($callback);
 
-            if ($result = $handler($this->retrieveUser($request, $options['guards'] ?? null), ...$parameters)) {
+            if ($result = $handler($this->retrieveUser($request, $channel), ...$parameters)) {
                 return $this->validAuthenticationResponse($request, $result);
             }
         }
@@ -278,7 +277,7 @@ abstract class Broadcaster implements BroadcasterContract
     protected function retrieveChannelOptions($channel)
     {
         foreach ($this->channelsOptions as $pattern => $opts) {
-            if (! Str::is(preg_replace('/\{(.*?)\}/', '*', $pattern), $channel)) {
+            if (! $this->channelNameMatchPattern($channel, $pattern)) {
                 continue;
             }
 
@@ -289,15 +288,18 @@ abstract class Broadcaster implements BroadcasterContract
     }
 
     /**
-     * Retrieve user by checking in provided guards
+     * Retrieve request user using optional guards
      *
      * @param  \Illuminate\Http\Request  $request
-     * @param  array  $guards
-     *
+     * @param  string  $channel
      * @return mixed
      */
-    protected function retrieveUser($request, $guards = null)
+    protected function retrieveUser($request, $channel)
     {
+        $options = $this->retrieveChannelOptions($channel);
+
+        $guards = $options['guards'] ?? null;
+
         if (is_null($guards)) {
             return $request->user();
         }
@@ -311,5 +313,17 @@ abstract class Broadcaster implements BroadcasterContract
         }
 
         return null;
+    }
+
+    /**
+     * Check if channel name from request match a pattern from registered channels
+     *
+     * @param  string  $channel
+     * @param  string  $pattern
+     * @return bool
+     */
+    protected function channelNameMatchPattern($channel, $pattern)
+    {
+        return Str::is(preg_replace('/\{(.*?)\}/', '*', $pattern), $channel);
     }
 }
