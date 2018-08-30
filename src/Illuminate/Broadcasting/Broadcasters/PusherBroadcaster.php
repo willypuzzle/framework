@@ -50,9 +50,16 @@ class PusherBroadcaster extends Broadcaster
             $options = $opts;
         }
 
-        if (Str::startsWith($request->channel_name, ['private-', 'presence-']) &&
-            ! $request->user($options['guard'] ?? null)) {
-            throw new AccessDeniedHttpException;
+        if (Str::startsWith($request->channel_name, ['private-', 'presence-'])) {
+            $ctrl = false;
+            foreach(($options['guards'] ?? []) as $guard){
+                if($request->user($guard)){
+                    $ctrl = true;
+                }
+            }
+            if(!$ctrl && !$request->user()){
+                throw new AccessDeniedHttpException;
+            }
         }
 
         return parent::verifyUserCanAccessChannel(
